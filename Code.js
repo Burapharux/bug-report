@@ -8,158 +8,8 @@ const targetColumn = Number(PropertiesService.getScriptProperties().getProperty(
 const summaryColumn = Number(PropertiesService.getScriptProperties().getProperty('SUMMARY_COLUMN'));
 const departmentCellName = PropertiesService.getScriptProperties().getProperty('DEPARTMENT_CELL_NAME');
 
-
-
-// Interface for Subscriber
-class Subscriber {
-  sendMessage(message) {
-    throw new Error("Method not implemented.");
-  }
-}
-
-// LineSubscriber class implementing the Subscriber interface
-class LineSubscriber extends Subscriber {
-  constructor(token, groupId) {
-    super();
-    this.token = token;
-    this.groupId = groupId;
-  }
-
-  sendMessage(message) {
-    const url = 'https://api.line.me/v2/bot/message/push';
-    
-    const payload = {
-      "to": this.groupId,
-      "messages": [{
-        "type": "text",
-        "text": message
-      }]
-    };
-
-    const options = {
-      "method": "post",
-      "contentType": "application/json",
-      "headers": {
-        "Authorization": "Bearer " + this.token
-      },
-      "payload": JSON.stringify(payload)
-    };
-
-    try {
-      const response = UrlFetchApp.fetch(url, options);
-      Logger.log('Response Code: ' + response.getResponseCode());
-      Logger.log('Response Body: ' + response.getContentText());
-    } catch (e) {
-      Logger.log('Error sending message: ' + e.toString());
-    }
-  }
-}
-
-// Notifier class
-class Notifier {
-  constructor() {
-    this.subscribers = [];
-    this.strategy = null; // Placeholder for strategy if needed
-  }
-
-  subscribe(s) {
-    this.subscribers.push(s);
-  }
-
-  unsubscribe(s) {
-    this.subscribers = this.subscribers.filter(subscriber => subscriber !== s);
-  }
-
-  notifySubscribers(message) {
-    this.subscribers.forEach(subscriber => subscriber.sendMessage(message));
-  }
-
-  setStrategy(strategy) {
-    this.strategy = strategy;
-  }
-
-  executeStrategy(e) {
-    if (this.strategy) {
-      const message = this.strategy.execute(e);
-      if (!message) {
-        Logger.log("No action taken by the strategy.");
-        return;
-      }
-      Logger.log("Strategy executed, returning message: " + message);
-      this.notifySubscribers(message);
-    } else {
-      throw new Error("No strategy set.");
-    }
-  }
-
-}
-
-// Create FormStrategy interface
-class FormStrategy {
-  execute(e) {
-    throw new Error("Method not implemented.");
-  }
-}
-
-class NewFormSubmissionStrategy extends FormStrategy {
-  execute(e) {
-    let formResponse = e.response;
-    let itemResponses = formResponse.getItemResponses();
-
-    // Get the title from cell 'cellName' of the Google Sheet
-    const sheet = SpreadsheetApp.openById(sheetId);
-    const sheetObj = sheet.getSheetByName(sheetName);
-    const titleToMatch = sheetObj.getRange(summaryCellName).getValue();
-    const departmentTitle = sheetObj.getRange(departmentCellName).getValue();
-    let outputString;
-    let departmentValue;
-
-    // Find department value from form responses
-    itemResponses.forEach(itemResponse => {
-      if (itemResponse.getItem().getTitle() === departmentTitle) {
-        departmentValue = itemResponse.getResponse();
-      }
-    });
-
-    // Find and notify only the response that matches the title in 'cellName'
-    itemResponses.forEach(itemResponse => {
-      if (itemResponse.getItem().getTitle() === titleToMatch) {
-        outputString = "ได้รับแจ้งข้อผิดพลาดใหม่" + " : " + itemResponse.getResponse();
-        if (departmentValue) {
-          outputString += " (แผนก: " + departmentValue + ")";
-        }
-      }
-    });
-    return outputString !== undefined ? outputString : undefined;
-  }
-}
-
-class UpdateFormSubmissionStrategy extends FormStrategy {
-  execute(e) {
-    // Get the edited sheet
-    const sheet = e.source.getActiveSheet();
-    
-    // Get the edited cell's row and column
-    const editedRow = e.range.getRow();
-    const editedColumn = e.range.getColumn();
-    
-    // Check if the edited column is the target column
-    if (editedColumn === targetColumn) {
-      // Get the whole row as an array
-      const rowData = sheet.getRange(editedRow, 1, 1, sheet.getLastColumn()).getValues()[0];
-      
-      // Log the entire row data
-      Logger.log('Edited Row Data: ' + rowData[summaryColumn - 1]); // Adjust for zero-based index
-      return "มีการเปลี่ยนแปลงสถานะของ: " + rowData[summaryColumn - 1] + "เป็นสถานะ " + rowData[targetColumn - 1];
-      
-    }
-    return undefined; // No action if the edited column is not the target column
-  }
-}
-
-const notifier = new Notifier();
-const lineSubscriber = new LineSubscriber(token, groupId);
-notifier.subscribe(lineSubscriber);
+let notifier;
+let lineSubscriber;
 
 // Setup a trigger
 function createFormSubmitTrigger() {
@@ -169,17 +19,6 @@ function createFormSubmitTrigger() {
 
   ScriptApp.newTrigger("wrappedOnFormSubmit").forForm(form).onFormSubmit().create();
   console.log("Ran the createFormSubmitTrigger");
-}
-
-// Wrapper function to handle form submission
-function wrappedOnFormSubmit(e) {
-  notifier.setStrategy(new NewFormSubmissionStrategy());
-  notifier.executeStrategy(e);
-}
-
-function onEditTriggerHandler(e) {
-  notifier.setStrategy(new UpdateFormSubmissionStrategy());
-  notifier.executeStrategy(e);
 }
 
 function createSheetEditTrigger() {
@@ -201,7 +40,27 @@ function createSheetEditTrigger() {
   Logger.log('Trigger created successfully.');
 }
 
+function setUpNotifiers() {
+  notifier = new Notifier();
+  lineSubscriber = new LineSubscriber(token, groupId);
+  notifier.subscribe(lineSubscriber);
+}
+
+// Wrapper function to handle form submission
+function wrappedOnFormSubmit(e) {
+  setUpNotifiers();
+  notifier.setStrategy(new NewFormSubmissionStrategy());
+  notifier.executeStrategy(e);
+}
+
+function onEditTriggerHandler(e) {
+  setUpNotifiers();
+  notifier.setStrategy(new UpdateFormSubmissionStrategy());
+  notifier.executeStrategy(e);
+}
+
 function setup() {
+  setUpNotifiers();
   createFormSubmitTrigger();
   createSheetEditTrigger();
   console.log("Setup completed. Triggers created for form submission and onEdit events.");
