@@ -6,6 +6,7 @@ const sheetName = PropertiesService.getScriptProperties().getProperty('SHEET_NAM
 const summaryCellName = PropertiesService.getScriptProperties().getProperty('SUMMARY_CELL_NAME');
 const targetColumn = Number(PropertiesService.getScriptProperties().getProperty('TARGET_COLUMN'));
 const summaryColumn = Number(PropertiesService.getScriptProperties().getProperty('SUMMARY_COLUMN'));
+const departmentCellName = PropertiesService.getScriptProperties().getProperty('DEPARTMENT_CELL_NAME');
 
 
 
@@ -106,17 +107,30 @@ class NewFormSubmissionStrategy extends FormStrategy {
     let itemResponses = formResponse.getItemResponses();
 
     // Get the title from cell 'cellName' of the Google Sheet
-    const sheet = SpreadsheetApp.openById(sheetId); // Replace with your sheet ID
-    const titleToMatch = sheet.getSheetByName(sheetName).getRange(summaryCellName).getValue(); // Replace with your sheet name
-    let outputString = "";
-    
+    const sheet = SpreadsheetApp.openById(sheetId);
+    const sheetObj = sheet.getSheetByName(sheetName);
+    const titleToMatch = sheetObj.getRange(summaryCellName).getValue();
+    const departmentTitle = sheetObj.getRange(departmentCellName).getValue();
+    let outputString;
+    let departmentValue;
+
+    // Find department value from form responses
+    itemResponses.forEach(itemResponse => {
+      if (itemResponse.getItem().getTitle() === departmentTitle) {
+        departmentValue = itemResponse.getResponse();
+      }
+    });
+
     // Find and notify only the response that matches the title in 'cellName'
     itemResponses.forEach(itemResponse => {
       if (itemResponse.getItem().getTitle() === titleToMatch) {
         outputString = "ได้รับแจ้งข้อผิดพลาดใหม่" + " : " + itemResponse.getResponse();
+        if (departmentValue) {
+          outputString += " (แผนก: " + departmentValue + ")";
+        }
       }
     });
-    return outputString;
+    return outputString !== undefined ? outputString : undefined;
   }
 }
 
