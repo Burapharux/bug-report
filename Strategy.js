@@ -1,4 +1,3 @@
-// Create FormStrategy interface
 class Strategy {
   execute(e) {
     throw new Error("Method not implemented.");
@@ -9,36 +8,33 @@ class NewFormSubmissionStrategy extends Strategy {
   execute(e) {
     let formResponse = e.response;
     let itemResponses = formResponse.getItemResponses();
-
-    // Get the title from cell 'cellName' of the Google Sheet
     const sheet = SpreadsheetApp.openById(sheetId);
     const sheetObj = sheet.getSheetByName(sheetName);
-    const titleToMatch = sheetObj.getRange(summaryCellName).getValue();
-    const departmentTitle = sheetObj.getRange(departmentCellName).getValue();
-    let outputString;
-    let departmentValue;
 
-    // Find department value from form responses
-    itemResponses.forEach(itemResponse => {
-      if (itemResponse.getItem().getTitle() === departmentTitle) {
-        departmentValue = itemResponse.getResponse();
-      }
-    });
+    const reducedItemResponses = itemResponses.reduce((acc, itemResponse) => {
+      acc[itemResponse.getItem().getTitle()] = itemResponse.getResponse();
+      return acc;
+    }, {});
 
-    // Find and notify only the response that matches the title in 'cellName'
-    itemResponses.forEach(itemResponse => {
-      if (itemResponse.getItem().getTitle() === titleToMatch) {
-        outputString = "ได้รับแจ้งข้อผิดพลาดใหม่" + " : " + itemResponse.getResponse();
-        if (departmentValue) {
-          outputString += " (แผนก: " + departmentValue + ")";
-        }
-      }
-    });
-    return outputString !== undefined ? outputString : undefined;
+    const titleColumn = sheetObj.getRange(summaryCellName).getValue();
+    const departmentColumn = sheetObj.getRange(departmentCellName).getValue();
+
+    // Construct the output string
+    if (!reducedItemResponses[titleColumn]) {
+      return undefined;
+    }
+    let outputString = "ได้รับการแจ้งข้อผิดพลาดใหม่: " + reducedItemResponses[titleColumn];
+    const departmentTitle = reducedItemResponses[departmentColumn];
+    if (departmentTitle) {
+      outputString += " (แผนก: " + departmentTitle + ")";
+    }
+    // Notify the user
+    return outputString;
   }
+
 }
 
-class UpdateFormSubmissionStrategy extends Strategy {
+class UpdateSheetStrategy extends Strategy {
   execute(e) {
     // Get the edited sheet
     const sheet = e.source.getActiveSheet();

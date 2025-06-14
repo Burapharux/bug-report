@@ -55,7 +55,7 @@ function wrappedOnFormSubmit(e) {
 
 function onEditTriggerHandler(e) {
   setUpNotifiers();
-  notifier.setStrategy(new UpdateFormSubmissionStrategy());
+  notifier.setStrategy(new UpdateSheetStrategy());
   notifier.executeStrategy(e);
 }
 
