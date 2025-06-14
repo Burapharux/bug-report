@@ -49,7 +49,14 @@ function setUpNotifiers() {
 // Wrapper function to handle form submission
 function wrappedOnFormSubmit(e) {
   setUpNotifiers();
-  notifier.setStrategy(new NewFormSubmissionStrategy());
+  const bugReportFormConfig = {
+  outputTemplate: "New error reported: {{title}} (Department: {{department}})",
+  fieldMap: {
+    title: summaryCellName,        // Maps 'title' placeholder to the form field 'Summary'
+    department: departmentCellName // Maps 'department' placeholder to the form field 'Department'
+  }
+};
+  notifier.setStrategy(new NewFormSubmissionStrategy(bugReportFormConfig));
   notifier.executeStrategy(e);
 }
 
