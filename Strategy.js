@@ -5,33 +5,33 @@ class Strategy {
 }
 
 class NewFormSubmissionStrategy extends Strategy {
-  execute(e) {
-    let formResponse = e.response;
-    let itemResponses = formResponse.getItemResponses();
-    const sheet = SpreadsheetApp.openById(sheetId);
-    const sheetObj = sheet.getSheetByName(sheetName);
+  constructor(config) {
+    super();
+    this.outputTemplate = config.outputTemplate;
+    this.fieldMap = config.fieldMap;
+    this.sheet = SpreadsheetApp.openById(sheetId);
+    this.sheetObj = this.sheet.getSheetByName(sheetName);
+  }
 
-    const reducedItemResponses = itemResponses.reduce((acc, itemResponse) => {
+  static getReducedItemResponses(itemResponses) {
+    return itemResponses.reduce((acc, itemResponse) => {
       acc[itemResponse.getItem().getTitle()] = itemResponse.getResponse();
       return acc;
     }, {});
-
-    const titleColumn = sheetObj.getRange(summaryCellName).getValue();
-    const departmentColumn = sheetObj.getRange(departmentCellName).getValue();
-
-    // Construct the output string
-    if (!reducedItemResponses[titleColumn]) {
-      return undefined;
-    }
-    let outputString = "ได้รับการแจ้งข้อผิดพลาดใหม่: " + reducedItemResponses[titleColumn];
-    const departmentTitle = reducedItemResponses[departmentColumn];
-    if (departmentTitle) {
-      outputString += " (แผนก: " + departmentTitle + ")";
-    }
-    // Notify the user
-    return outputString;
   }
 
+  execute(e) {
+    let formResponse = e.response;
+    let itemResponses = formResponse.getItemResponses();
+    const reducedItemResponses = NewFormSubmissionStrategy.getReducedItemResponses(itemResponses);
+
+    // Build output string using template and fieldMap
+    let output = this.outputTemplate;
+    for (const [placeholder, fieldId] of Object.entries(this.fieldMap)) {
+      output = output.replace(`{{${placeholder}}}`, reducedItemResponses[this.sheetObj.getRange(fieldId).getValue()] || "");
+    }
+    return output;
+  }
 }
 
 class UpdateSheetStrategy extends Strategy {
