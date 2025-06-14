@@ -5,16 +5,23 @@ class Strategy {
 }
 
 class NewFormSubmissionStrategy extends Strategy {
+  static getReducedItemResponses(itemResponses) { // this should be private static method. what a pity 
+    return itemResponses.reduce((acc, itemResponse) => {
+      acc[itemResponse.getItem().getTitle()] = itemResponse.getResponse();
+      return acc;
+    }, {});
+  }
+
   execute(e) {
     let formResponse = e.response;
     let itemResponses = formResponse.getItemResponses();
     const sheet = SpreadsheetApp.openById(sheetId);
     const sheetObj = sheet.getSheetByName(sheetName);
 
-    const reducedItemResponses = itemResponses.reduce((acc, itemResponse) => {
-      acc[itemResponse.getItem().getTitle()] = itemResponse.getResponse();
-      return acc;
-    }, {});
+    const reducedItemResponses = getReducedItemResponses(itemResponses);
+    if (!reducedItemResponses) {
+      return undefined; // No item responses to process
+    }
 
     const titleColumn = sheetObj.getRange(summaryCellName).getValue();
     const departmentColumn = sheetObj.getRange(departmentCellName).getValue();
